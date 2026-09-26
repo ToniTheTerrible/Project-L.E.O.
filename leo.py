@@ -1,4 +1,7 @@
-﻿import os
+﻿import sys
+sys.dont_write_bytecode = True
+
+import os
 import socket
 import sys
 import time

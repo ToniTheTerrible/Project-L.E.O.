@@ -1,0 +1,96 @@
+from interpreter import interpreter
+import interpreter.core.respond as respond_module
+
+# Patch Open Interpreter error-handler bug safely
+respond_module.display_markdown_message = lambda *args, **kwargs: None
+
+# Backend settings
+interpreter.llm.model = "groq/openai/gpt-oss-20b"
+interpreter.llm.api_key = "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"
+interpreter.llm.context_window = 131072
+interpreter.llm.max_tokens = 4096
+
+# Operational flags
+interpreter.auto_run = True
+interpreter.verbose = False
+interpreter.debug_mode = False
+
+interpreter.system_message = (
+    "You are LEO, a helpful and polite tactical AI assistant. ALWAYS IMMEDIATELY EXECUTE code (Python or PowerShell)—never just suggest unexecuted code. "
+    "CRITICAL: You MUST ALWAYS output a short, polite text sentence to the user AFTER executing any code explaining what you did. "
+    "For file operations, use PowerShell with $env:USERPROFILE. "
+    "For crypto data, use CoinGecko API. "
+    "\n\n"
+    "SYSTEM VOLUME CONTROL: Execute Python with pycaw (convert percentage 0-100 to float 0.0-1.0): "
+    "import comtypes; comtypes.CoInitialize(); "
+    "from pycaw.pycaw import AudioUtilities; "
+    "device = AudioUtilities.GetSpeakers(); "
+    "volume = device.EndpointVolume; "
+    "volume.SetMasterVolumeLevelScalar(0.30, None)"
+    "\n\n"
+    "BROWSER TASKS: ALWAYS reuse one persistent browser tab, never open a new window per task. "
+    "Before any browser action, run this exact setup check first: "
+    "if 'PAGE' not in globals():\n"
+    "    from playwright.sync_api import sync_playwright\n"
+    "    PW = sync_playwright().start()\n"
+    "    BROWSER = PW.chromium.launch(headless=False)\n"
+    "    PAGE = BROWSER.new_page()\n"
+    "Then reuse PAGE for every subsequent browser action in the same session. "
+    "\n\n"
+    "YOUTUBE: in the SAME PAGE object run: "
+    "PAGE.goto('https://www.youtube.com'); "
+    "PAGE.fill('input#search', 'QUERY'); "
+    "PAGE.press('input#search', 'Enter'); "
+    "PAGE.wait_for_selector('ytd-video-renderer a#video-title'); "
+    "PAGE.click('ytd-video-renderer a#video-title')"
+    "\n\n"
+    "FINDING/DOWNLOADING A PICTURE OF SOMETHING: use the Unsplash API, NOT Google Images scraping: "
+    "import requests; "
+    "r = requests.get('https://api.unsplash.com/search/photos', "
+    "params={'query': 'SUBJECT', 'per_page': 1}, "
+    "headers={'Authorization': 'Client-ID -dIXdIzIOw2JOOVyFfWyFlOywtuC3nqMVX0r_kvJ4sI'}).json(); "
+    "url = r['results'][0]['urls']['regular']; "
+    "open(SAVE_PATH, 'wb').write(requests.get(url).content)"
+)
+
+print("====================================================")
+print("  [ L.E.O. TACTICAL HUD ONLINE ]")
+print("  [ SYSTEM STATUS: ONLINE - BACKEND: GROQ GPT-OSS ]")
+print("====================================================\n")
+
+while True:
+    try:
+        user_input = input("> ")
+    except (EOFError, KeyboardInterrupt):
+        print("\n[ LEO OFFLINE ]")
+        break
+
+    if not user_input.strip():
+        continue
+    if user_input.strip().lower() in ("exit", "quit"):
+        print("[ LEO OFFLINE ]")
+        break
+
+    # Prevent Groq 8,000 TPM Rate Limit by capping chat history
+    if len(interpreter.messages) > 6:
+        interpreter.messages = interpreter.messages[-6:]
+
+    try:
+        has_printed = False
+        for chunk in interpreter.chat(user_input, display=False, stream=True):
+            if isinstance(chunk, dict) and chunk.get("type") == "message":
+                content = chunk.get("content")
+                if content:
+                    print(str(content), end="", flush=True)
+                    has_printed = True
+
+        if not has_printed:
+            print("[ Task executed successfully. ]")
+        else:
+            print()
+
+    except Exception as e:
+        if "Rate limit" in str(e) or "429" in str(e):
+            print("\n[ LEO: Groq rate limit hit. Please wait ~15 seconds before trying again. ]")
+        else:
+            print(f"\n[ LEO Error: {e} ]")

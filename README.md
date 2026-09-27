@@ -42,7 +42,7 @@ or use `leo.bat`, which is what the hotkey and whistle triggers actually launch.
 ## Architecture
 
 - **`leo.py`** — main entry point: HUD splash screen, Open Interpreter setup, hybrid backend switching, terminal chat loop.
-- **`yt.py`** — browser control module. Attaches to a real Chrome instance via remote debugging (a dedicated profile, `LEOProfile`) so browser tasks reuse one persistent tab/session across commands instead of opening new windows each time. Exposes `browse(url)` for general sites and `youtube_search(query)` for YouTube specifically.
+- **`browser.py`** — browser control module. Attaches to a real Chrome instance via remote debugging (a dedicated profile, `LEOProfile`) so browser tasks reuse one persistent tab/session across commands instead of opening new windows each time. Exposes `browse(url)` for general sites and `youtube_search(query)` for YouTube specifically.
 - **`config.py`** — holds API keys, excluded from git via `.gitignore`. Must be recreated manually on any new machine.
 - **`whistle.py`** — background listener using FFT-based pitch detection on the default microphone; launches `leo.bat` when a sustained whistle in the 1200–3000 Hz range is detected. Runs at Windows login via a shortcut in the Startup folder, pointing at `leo_whistle.vbs`.
 - **`leo_whistle.vbs`** — silently launches `whistle.py` with `pythonw.exe` (no visible console window) at startup.

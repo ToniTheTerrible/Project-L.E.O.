@@ -71,7 +71,3 @@ Backend switching is connection-based and automatic by default (`auto` mode). Ma
 - General web browsing and YouTube search/playback (via Selenium + a real Chrome window)
 - Screen capture and description (via `moondream`, local)
 - Image search and download (via Unsplash API)
-
-## Version History
-
-See `/old versions` for the full changelog of prior iterations, from the initial CLI release through HUD development, audio, native browser control, screen reading, hybrid auto-mode, and whistle activation.

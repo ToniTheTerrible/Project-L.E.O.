@@ -12,6 +12,7 @@ import threading
 import tkinter as tk
 import io
 import contextlib
+import voice
 
 # ==========================================
 # 0. GLOBAL SINGLE-INSTANCE LOCK
@@ -126,8 +127,8 @@ def load_leo_backend():
     status_text = "MOUNTING SYSTEM MODULES & APIS..."
     interp.system_message = (
         "You are LEO, a helpful tactical AI assistant. ALWAYS IMMEDIATELY EXECUTE Python or PowerShell code. "
-        "RESPONSE STYLE: Speak like a voice assistant, not a chatbot. NEVER use markdown tables, bullet lists, headers, or bold text. Keep every response to one short spoken sentence. "
-        "Before executing any task, in the SAME response say a brief, natural confirmation (e.g., 'Right away.', 'Processing now.', or 'This might take a moment.') AND immediately include the code to execute it — do not split these into separate responses. "
+        "RESPONSE STYLE: Speak like a voice assistant, not a chatbot. Always address the user as 'sir'. NEVER use markdown tables, bullet lists, headers, or bold text. Keep every response to one short spoken sentence. "
+        "Before executing any task, in the SAME response say a brief, natural confirmation AND immediately include the code to execute it — do not split these into separate responses. "
         "The estimated time is spoken flavor text ONLY. NEVER add time.sleep() or any artificial delay to match it — execute the actual code immediately, with no intentional waiting. "
         "CRITICAL: After execution, respond with ONE short spoken sentence. If the user asked a question or requested information (recall, screen description, status, or anything they want to know), that sentence MUST contain the actual answer or data itself — never a vague acknowledgment. Reserve generic confirmations like 'Task completed successfully' ONLY for pure action commands (opening a site, adjusting volume) where nothing needs to be reported back. "
         "For file operations, use PowerShell with $env:USERPROFILE. "
@@ -136,6 +137,8 @@ def load_leo_backend():
         "If the user asks for their name, who they are, or ANY personal facts, you do not know the answer natively. You MUST ALWAYS instantly execute this code to find out: "
         "import drive_memory; print(drive_memory.recall()) "
         "Do not guess or say 'I don't know' without running this code first."
+        "\n\n"
+        "\n\n"
         "\n\n"
         "\n\n"
         "SCREEN CAPTURE & DESKTOP VISION: When asked to see, look at, or analyze the screen/desktop/wallpaper, ALWAYS execute this EXACT Python code block: "
@@ -324,7 +327,6 @@ def run_splash_screen():
 
 # Execute HUD GUI directly on launch
 run_splash_screen()
-
 # ==========================================
 # 3. TERMINAL INTERACTION LOOP
 # ==========================================
@@ -379,7 +381,7 @@ while True:
             current_backend = desired
             print(f"[ LEO: connection changed — auto-switched to {desired.upper()} ]")
 
-        # Keep the last 6 messages so L.E.O. remembers recent context
+    # Keep the last 6 messages so L.E.O. remembers recent context
     if len(interpreter.messages) > 6:
         interpreter.messages = interpreter.messages[-6:]
 
@@ -388,13 +390,28 @@ while True:
 
     try:
         has_printed = False
+        sentence_buffer = ""
+        
         with contextlib.redirect_stdout(noise_buffer):
             for chunk in interpreter.chat(user_input, display=False, stream=True):
                 if isinstance(chunk, dict):
                     if chunk.get("type") == "message" and chunk.get("content"):
-                        real_stdout.write(str(chunk["content"]))
+                        content = str(chunk["content"])
+                        real_stdout.write(content)
                         real_stdout.flush()
                         has_printed = True
+                        
+                        sentence_buffer += content
+                        
+                        # Trigger speech immediately whenever a sentence boundary is hit
+                        if any(p in content for p in [".", "!", "?", "\n"]):
+                            if sentence_buffer.strip():
+                                voice.speak(sentence_buffer.strip())
+                                sentence_buffer = ""
+
+        # Catch any trailing text left in the buffer
+        if sentence_buffer.strip():
+            voice.speak(sentence_buffer.strip())
 
         if not has_printed:
             print("[ Task executed successfully in the background. ]")

@@ -1,5 +1,5 @@
 @echo off
-cd /d "C:\Users\Toniz\Desktop\Project-LEO"
-python "C:\Users\Toniz\Desktop\Project-LEO\leo.py"
+cd /d "%~dp0"
+python "%~dp0leo.py"
 if %ERRORLEVEL% equ 99 exit 0
 pause

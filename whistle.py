@@ -6,6 +6,9 @@ import subprocess
 import sounddevice as sd
 import numpy as np
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LEO_BAT = os.path.join(BASE_DIR, "leo.bat")
+
 # ==========================================
 # 1. HARD SINGLE-INSTANCE LOCK
 # ==========================================
@@ -22,8 +25,8 @@ SAMPLE_RATE = 44100
 BLOCK_SIZE = 4096       # ~0.1 seconds of audio per block
 
 # Frequency band for human whistles
-FREQ_MIN = 1200         
-FREQ_MAX = 3000         
+FREQ_MIN = 1200
+FREQ_MAX = 3000
 
 # Sensitivity tuning
 PROMINENCE = 10.0        # Tone must be x times louder than background noise
@@ -47,7 +50,7 @@ def is_leo_already_open():
 
 def audio_callback(indata, frames, time_info, status):
     global whistle_frames, in_cooldown, cooldown_start
-    
+
     current_time = time.time()
 
     if in_cooldown:
@@ -58,21 +61,21 @@ def audio_callback(indata, frames, time_info, status):
 
     # Flatten the audio chunk into a 1D array
     audio_data = indata[:, 0]
-    
+
     # 1. Fast Fourier Transform: Convert raw audio into a frequency spectrum
     fft_result = np.abs(np.fft.rfft(audio_data))
     freqs = np.fft.rfftfreq(BLOCK_SIZE, 1 / SAMPLE_RATE)
-    
+
     # 2. Isolate the target whistle frequencies
     whistle_indices = np.where((freqs >= FREQ_MIN) & (freqs <= FREQ_MAX))[0]
-    
+
     if len(whistle_indices) == 0:
         return
-        
+
     # 3. Analyze energy levels
     whistle_peak = np.max(fft_result[whistle_indices])
     avg_background = np.mean(fft_result)
-    
+
     # 4. Check if it's a loud, pure tone standing out from background noise
     if whistle_peak > MIN_MAGNITUDE and whistle_peak > (avg_background * PROMINENCE):
         whistle_frames += 1
@@ -85,13 +88,13 @@ def audio_callback(indata, frames, time_info, status):
         in_cooldown = True
         cooldown_start = current_time
         whistle_frames = 0
-        
+
         if not is_leo_already_open():
-            wt_path = os.path.join(os.environ.get('LOCALAPPDATA', r'C:\Users\Toniz\AppData\Local'), r'Microsoft\WindowsApps\wt.exe')
+            wt_path = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser(r'~\AppData\Local')), r'Microsoft\WindowsApps\wt.exe')
             try:
-                subprocess.Popen([wt_path, "cmd", "/k", r"C:\Users\Toniz\Desktop\Project-LEO\leo.bat"])
+                subprocess.Popen([wt_path, "cmd", "/k", LEO_BAT])
             except FileNotFoundError:
-                os.startfile(r"C:\Users\Toniz\Desktop\Project-LEO\leo.bat")
+                os.startfile(LEO_BAT)
 
 try:
     with sd.InputStream(callback=audio_callback, channels=1, samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE):

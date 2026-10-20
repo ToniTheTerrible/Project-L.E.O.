@@ -4,6 +4,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+from google.auth.exceptions import RefreshError
 
 # drive.file scope: LEO can only see/edit files IT creates, not your whole Drive
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
@@ -16,12 +17,21 @@ def _get_credentials():
     creds = None
     if os.path.exists(TOKEN_PATH):
         creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+
+    changed = False
+    if creds and not creds.valid and creds.expired and creds.refresh_token:
+        try:
             creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
-            creds = flow.run_local_server(port=0)
+            changed = True
+        except RefreshError:
+            creds = None  # token dead, fall through to a fresh login
+
+    if not creds or not creds.valid:
+        flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
+        creds = flow.run_local_server(port=0)
+        changed = True
+
+    if changed:
         with open(TOKEN_PATH, 'w') as f:
             f.write(creds.to_json())
     return creds

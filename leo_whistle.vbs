@@ -1,2 +1,4 @@
+Set fso = CreateObject("Scripting.FileSystemObject")
 Set objShell = CreateObject("WScript.Shell")
-objShell.Run "pythonw.exe ""C:\Users\Toniz\Desktop\Project-LEO\whistle.py""", 0, False
+folder = fso.GetParentFolderName(WScript.ScriptFullName)
+objShell.Run "pythonw.exe """ & folder & "\whistle.py""", 0, False

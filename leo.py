@@ -51,6 +51,7 @@ is_loaded = False
 status_text = "INITIALIZING TACTICAL SYSTEMS..."
 current_backend = "cloud"
 auto_mode = True
+memory_warning = ""
 
 def play_boot_sound():
     sound_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "boot.wav")
@@ -117,7 +118,7 @@ def apply_cloud_backend():
     interpreter.messages = []
 
 def load_leo_backend():
-    global interpreter, is_loaded, status_text
+    global interpreter, is_loaded, status_text, memory_warning
     start_time = time.time()
 
     status_text = "LOADING OPEN-INTERPRETER CORE..."
@@ -181,19 +182,31 @@ def load_leo_backend():
         "open(SAVE_PATH, 'wb').write(requests.get(url).content)"
     )
 
-    # Preload personal memory so simple questions don't need a Drive round trip
+    # Preload personal memory (never opens a login window during boot)
     status_text = "LOADING PERSONAL MEMORY..."
     if has_internet():
-        try:
-            import drive_memory
-            facts = drive_memory.recall()
-            if isinstance(facts, dict) and facts:
-                interp.system_message += (
-                    "\n\nKNOWN FACTS ABOUT THE USER (already loaded; answer from these directly without running recall): "
-                    + json.dumps(facts, ensure_ascii=False)
-                )
-        except Exception:
-            pass
+        result = {}
+
+        def _load_facts():
+            try:
+                import drive_memory
+                result["facts"] = drive_memory.recall(interactive=False)
+            except Exception as e:
+                if type(e).__name__ == "AuthRequired":
+                    result["auth"] = True
+
+        t = threading.Thread(target=_load_facts, daemon=True)
+        t.start()
+        t.join(timeout=8)  # a slow network can never hold the splash hostage
+
+        facts = result.get("facts")
+        if isinstance(facts, dict) and facts:
+            interp.system_message += (
+                "\n\nKNOWN FACTS ABOUT THE USER (already loaded; answer from these directly without running recall): "
+                + json.dumps(facts, ensure_ascii=False)
+            )
+        if result.get("auth"):
+            memory_warning = "[ LEO: Drive memory needs re-authorization. Run: python drive_memory.py ]"
 
     status_text = "SYSTEM ONLINE. LAUNCHING..."
     interpreter = interp
@@ -351,6 +364,9 @@ print("====================================================")
 print("  [ L.E.O. TACTICAL HUD ONLINE ]")
 print("  [ AUTO MODE: switches CLOUD/LOCAL based on connection ]")
 print("====================================================\n")
+
+if memory_warning:
+    print(memory_warning + "\n")
 
 while True:
     try:
